@@ -1,0 +1,17 @@
+# 放在 fork 后仓库的 Config/PRIVATE.txt
+# 会被 Scripts/Settings.sh 自动追加到 .config（在 make defconfig 之前）
+# 只需要写"和上游不一样"的项，上游 AIROHA-ONU.txt + GENERAL.txt 已经包含绝大部分插件。
+
+# ===== 想补的插件写这里，例如 =====
+# CONFIG_PACKAGE_luci-app-upnp=y
+# CONFIG_PACKAGE_luci-app-samba4=y
+# CONFIG_PACKAGE_luci-app-diskman=y
+
+# ===== 不想要的插件写 =n，例如 =====
+# CONFIG_PACKAGE_luci-app-ssr-plus=n
+# CONFIG_PACKAGE_xray-core=n
+# CONFIG_PACKAGE_mihomo=n
+
+# ===== 注意：以下两项建议保持上游默认，别动 =====
+# CONFIG_PACKAGE_kmod-nft-offload=y    <- 硬件加速依赖它
+# CONFIG_NET_AIROHA_FLOW_STATS        <- 由 Scripts/PRIVATE.sh 在内核配置里关闭
