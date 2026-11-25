@@ -1,0 +1,189 @@
+# ==============================================================
+# 放在 fork 后仓库的 Config/PRIVATE.txt
+# Scripts/Settings.sh 会在 make defconfig 之前把它"最后"追加到 .config，
+# 因此这里的 =y / =n 优先级高于 Config/AIROHA-ONU.txt 和 Config/GENERAL.txt。
+#
+# 本文件按"你现有那台 477 包机器的实际用法"定制：
+#   去掉不用的 → 补齐缺少的 → 锁定关键项
+# 每个包名都对照 TEST 产物的 config 校验过，确认符号真实存在。
+# ==============================================================
+
+
+# ==============================================================
+# 一、排除：科学上网（SSR 全家桶）
+# 上游 Config/GENERAL.txt 里是 =y
+# ==============================================================
+CONFIG_PACKAGE_luci-app-ssr-plus=n
+CONFIG_PACKAGE_xray-core=n
+CONFIG_PACKAGE_dns2tcp=n
+
+# mihomo 会编进固件，但它的面板 luci-app-nikki 在这套源码树里根本不存在
+# （Packages.sh 里 nikki 的 UPDATE_PACKAGE 行是注释掉的），编了没人调用，白占约 20MB
+CONFIG_PACKAGE_mihomo=n
+CONFIG_PACKAGE_luci-app-nikki=n
+
+
+# ==============================================================
+# 二、排除：DDNS
+# 这套 CI 默认就是关的（你现在机器上有是 VSEAN 固件带的），这里锁死
+# ==============================================================
+CONFIG_PACKAGE_luci-app-ddns=n
+CONFIG_PACKAGE_luci-app-ddns-go=n
+CONFIG_PACKAGE_ddns-go=n
+CONFIG_PACKAGE_ddns-scripts=n
+
+
+# ==============================================================
+# 三、排除：Watchcat（同上，默认未开，锁死）
+# ==============================================================
+CONFIG_PACKAGE_luci-app-watchcat=n
+CONFIG_PACKAGE_watchcat=n
+
+
+# ==============================================================
+# 四、排除：iStore 应用商店（GENERAL.txt 里是 luci-app-store=y）
+# ==============================================================
+CONFIG_PACKAGE_luci-app-store=n
+
+
+# ==============================================================
+# 五、保留：Lucky（上游已是 =y，写明是为了让你一眼看到）
+# ==============================================================
+CONFIG_PACKAGE_luci-app-lucky=y
+CONFIG_PACKAGE_lucky=y
+CONFIG_PACKAGE_luci-i18n-lucky-zh-cn=y
+
+
+# ==============================================================
+# 六、补齐：WireGuard
+# 上游只开了 kmod-wireguard，缺 wg 命令和 LuCI 协议支持，
+# 等于"模块在、界面没有、配不了"。你现在的 wg0（10.10.10.1/24，端口 12321）必须靠这三条。
+# ==============================================================
+CONFIG_PACKAGE_kmod-wireguard=y
+CONFIG_PACKAGE_wireguard-tools=y
+CONFIG_PACKAGE_luci-proto-wireguard=y
+CONFIG_PACKAGE_qrencode=y
+
+
+# ==============================================================
+# 七、补回：你现在在用、但这套 CI 默认没编的
+# ==============================================================
+# bash（不少脚本 shebang 是 #!/bin/bash，busybox ash 会报错）
+CONFIG_PACKAGE_bash=y
+# jq（命令行处理 json，排障常用）
+CONFIG_PACKAGE_jq=y
+# 网页终端，你自己机器上就有
+CONFIG_PACKAGE_ttyd=y
+CONFIG_PACKAGE_luci-app-ttyd=y
+
+# 网络唤醒（WoL）
+# 注意：Config/GENERAL.txt 里有一行 CONFIG_PACKAGE_luci-app-wol=n 主动关掉了它，
+# 这里后写覆盖回 y。etherwake 是实际发包的工具，必须一起带上。
+CONFIG_PACKAGE_luci-app-wol=y
+CONFIG_PACKAGE_etherwake=y
+
+# KMS 激活服务器（vlmcsd）
+# 注意：Config/AIROHA-ONU.txt 第 29 行有 CONFIG_PACKAGE_vlmcsd=n 主动关掉了它，这里覆盖回 y。
+# 启动后默认监听 TCP 1688，记得在防火墙放行，否则局域网里的 Windows/Office 连不上。
+CONFIG_PACKAGE_vlmcsd=y
+CONFIG_PACKAGE_luci-app-vlmcsd=y
+# 中文语言包（若源码树里没有这两个包，defconfig 会静默丢掉，不影响编译）
+CONFIG_PACKAGE_luci-i18n-wol-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-vlmcsd-zh-cn=y
+
+# 流量统计（按 IP/主机统计）
+# 依赖：kmod-nf-conntrack-netlink 上游已开=y，libnetfilter-acct 需一起带上
+#
+# ⚠️ 重要：nlbwmon 靠 conntrack 计数。一旦 NPU/flowtable 硬件加速真正生效，
+#    已加速的连接会绕过 conntrack，这部分流量统计不到，数字会明显偏低。
+#    这不是配置问题，是"硬件加速"和"逐连接统计"的天然冲突。
+#    想看真实总带宽，用 状态→实时流量 或 luci-app-statistics（读网卡计数器，不受影响）。
+CONFIG_PACKAGE_luci-app-nlbwmon=y
+CONFIG_PACKAGE_nlbwmon=y
+CONFIG_PACKAGE_libnetfilter-acct=y
+CONFIG_PACKAGE_luci-i18n-nlbwmon-zh-cn=y
+
+
+# ==============================================================
+# 八、精简：确定用不上的（你这台是纯光猫主机，无 SATA/NVMe/硬盘/AC 管理）
+# ==============================================================
+# Gecoos AC 一体机管理，你没有这种设备（约 200KB）
+CONFIG_PACKAGE_luci-app-gecoosac=n
+CONFIG_PACKAGE_gecoosac=n
+CONFIG_PACKAGE_luci-i18n-gecoosac-zh-cn=n
+
+# SMART 硬盘检测 + NVMe 工具，没有可检测的盘（约 1.5MB）
+CONFIG_PACKAGE_smartmontools=n
+CONFIG_PACKAGE_smartmontools-drivedb=n
+CONFIG_PACKAGE_nvme-cli=n
+CONFIG_PACKAGE_libnvme=n
+
+# SATA/AHCI 控制器与 SMB 文件系统，设备上没有对应硬件，也没装 ksmbd 服务端
+CONFIG_PACKAGE_kmod-ata-ahci=n
+CONFIG_PACKAGE_kmod-ata-core=n
+CONFIG_PACKAGE_kmod-fs-ksmbd=n
+CONFIG_PACKAGE_kmod-fs-netfs=n
+CONFIG_PACKAGE_kmod-fs-smbfs-common=n
+
+# exFAT 格式化/修复工具（内核 exFAT 驱动仍保留，U 盘照样能读写）
+CONFIG_PACKAGE_exfat-fsck=n
+CONFIG_PACKAGE_exfat-mkfs=n
+
+# iPhone USB 共享网络（usbmuxd 一整套）
+CONFIG_PACKAGE_usbmuxd=n
+CONFIG_PACKAGE_libimobiledevice=n
+CONFIG_PACKAGE_kmod-usb-net-ipheth=n
+
+# USB 上网卡模式切换（3G/4G dongle 才需要；以后要插再改回 y）
+CONFIG_PACKAGE_usb-modeswitch=n
+
+
+# ==============================================================
+# 九、【可选大件】USB 无线网卡驱动全家桶 —— 默认保留，约 2~3MB（压缩后）
+# 如果你确定永远不插 USB 无线网卡，把下面整块取消注释能再瘦一圈。
+# 注意：取消后 cfg80211/mac80211 也会随之不装，LuCI 的"无线"菜单会消失。
+# ==============================================================
+# CONFIG_PACKAGE_kmod-rtw88=n
+# CONFIG_PACKAGE_kmod-rtw88-usb=n
+# CONFIG_PACKAGE_kmod-rtw88-8723d=n
+# CONFIG_PACKAGE_kmod-rtw88-8723du=n
+# CONFIG_PACKAGE_kmod-rtw88-8723x=n
+# CONFIG_PACKAGE_kmod-rtw88-8812a=n
+# CONFIG_PACKAGE_kmod-rtw88-8812au=n
+# CONFIG_PACKAGE_kmod-rtw88-8814a=n
+# CONFIG_PACKAGE_kmod-rtw88-8814au=n
+# CONFIG_PACKAGE_kmod-rtw88-8821a=n
+# CONFIG_PACKAGE_kmod-rtw88-8821au=n
+# CONFIG_PACKAGE_kmod-rtw88-8821c=n
+# CONFIG_PACKAGE_kmod-rtw88-8821cu=n
+# CONFIG_PACKAGE_kmod-rtw88-8822b=n
+# CONFIG_PACKAGE_kmod-rtw88-8822bu=n
+# CONFIG_PACKAGE_kmod-rtw88-8822c=n
+# CONFIG_PACKAGE_kmod-rtw88-8822cu=n
+# CONFIG_PACKAGE_kmod-rtw88-88xxa=n
+# CONFIG_PACKAGE_kmod-mt7921u=n
+# CONFIG_PACKAGE_kmod-mt7925u=n
+# CONFIG_PACKAGE_kmod-mt792x-usb=n
+
+
+# ==============================================================
+# 十、千万别动
+#   CONFIG_PACKAGE_kmod-nft-offload=y   <- flowtable 硬件加速依赖它
+#   CONFIG_NET_AIROHA_FLOW_STATS        <- 由 Scripts/PRIVATE.sh 在内核配置里关闭，
+#                                          这是 NPU 能真正绑定的前提
+# ==============================================================
+
+
+# ==============================================================
+# 附：还想加什么，取消注释即可（包名已确认在源码树里）
+# ==============================================================
+# 流量统计
+# CONFIG_PACKAGE_luci-app-nlbwmon=y
+# USB 共享 / 磁盘管理
+# CONFIG_PACKAGE_luci-app-samba4=y
+# CONFIG_PACKAGE_luci-app-diskman=y
+# Tailscale 内网穿透
+# CONFIG_PACKAGE_luci-app-tailscale-community=y
+#
+# 注：luci-app-autoreboot（定时重启）上游默认就是 =y，本次保留，约 50KB。
+#     不想要就加一行 CONFIG_PACKAGE_luci-app-autoreboot=n
