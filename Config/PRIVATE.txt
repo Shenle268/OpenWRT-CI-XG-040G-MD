@@ -17,10 +17,9 @@ CONFIG_PACKAGE_luci-app-ssr-plus=n
 CONFIG_PACKAGE_xray-core=n
 CONFIG_PACKAGE_dns2tcp=n
 
-# mihomo 会编进固件，但它的面板 luci-app-nikki 在这套源码树里根本不存在
-# （Packages.sh 里 nikki 的 UPDATE_PACKAGE 行是注释掉的），编了没人调用，白占约 20MB
+# mihomo 本体不用源码树里的旧包（=n），改用 nikki 官方仓库的 mihomo-meta
+# （PROVIDES:=mihomo，选 nikki 时会自动带上），避免两份 mihomo 重复
 CONFIG_PACKAGE_mihomo=n
-CONFIG_PACKAGE_luci-app-nikki=n
 
 
 # ==============================================================
@@ -47,7 +46,47 @@ CONFIG_PACKAGE_luci-app-store=n
 
 
 # ==============================================================
-# 五、保留：Lucky（上游已是 =y，写明是为了让你一眼看到）
+# 五、补装：Nikki（mihomo 透明代理 + LuCI 面板）
+# 源码由 Scripts/PRIVATE.sh 从 nikkinikki-org/OpenWrt-nikki 拉进 package/
+# mihomo-meta 会随依赖自动选中（v1.19.34，Go 编译约多花 15 分钟）
+# 依赖：firewall4、curl、yq、ip-full、kmod-tproxy/tun 等，defconfig 会自动补齐，
+# 下面显式写明是为了防止被别的 =n 意外压掉
+# ==============================================================
+CONFIG_PACKAGE_nikki=y
+CONFIG_PACKAGE_luci-app-nikki=y
+CONFIG_PACKAGE_luci-i18n-nikki-zh-cn=y
+CONFIG_PACKAGE_yq=y
+CONFIG_PACKAGE_ip-full=y
+CONFIG_PACKAGE_kmod-inet-diag=y
+CONFIG_PACKAGE_kmod-nft-socket=y
+CONFIG_PACKAGE_kmod-nft-tproxy=y
+CONFIG_PACKAGE_kmod-tun=y
+CONFIG_PACKAGE_kmod-dummy=y
+
+
+# ==============================================================
+# 六、补装：芯片状态面板 luci-app-airoha-npu
+# ponwrt 上游没有这个应用（旧 VSEAN 固件才有），源码由 Scripts/PRIVATE.sh
+# 自动从 lilaoye88/ImmortalWrt-Airoha 拉进 package/，这里再打开编译开关。
+# 它就是 LuCI 里的"芯片状态"页（NPU / PPE / Frame Engine 状态）。
+# 注意：FLOW_STATS 已关，面板里的流表 packets/bytes 计数会显示 0，属预期现象。
+# ==============================================================
+CONFIG_PACKAGE_luci-app-airoha-npu=y
+CONFIG_PACKAGE_luci-i18n-airoha-npu-zh-cn=y
+
+
+# ==============================================================
+# 六-1、补装：PON 状态概览卡片 luci-app-pon-status
+# 从旧固件备份重建（源码在仓库 local-packages/luci-app-pon-status/），
+# 在"状态/概览"页显示光模块收/发光功率、温度、电压电流、ONU 状态、流量。
+# 依赖 airoha-ponctl + /etc/config/pon（新固件已自带，均满足）。
+# 无独立菜单，装上即出现在概览页。
+# ==============================================================
+CONFIG_PACKAGE_luci-app-pon-status=y
+
+
+# ==============================================================
+# 七、保留：Lucky（上游已是 =y，写明是为了让你一眼看到）
 # ==============================================================
 CONFIG_PACKAGE_luci-app-lucky=y
 CONFIG_PACKAGE_lucky=y
@@ -55,7 +94,7 @@ CONFIG_PACKAGE_luci-i18n-lucky-zh-cn=y
 
 
 # ==============================================================
-# 六、补齐：WireGuard
+# 八、补齐：WireGuard
 # 上游只开了 kmod-wireguard，缺 wg 命令和 LuCI 协议支持，
 # 等于"模块在、界面没有、配不了"。你现在的 wg0（10.10.10.1/24，端口 12321）必须靠这三条。
 # ==============================================================
@@ -66,7 +105,7 @@ CONFIG_PACKAGE_qrencode=y
 
 
 # ==============================================================
-# 七、补回：你现在在用、但这套 CI 默认没编的
+# 九、补回：你现在在用、但这套 CI 默认没编的
 # ==============================================================
 # bash（不少脚本 shebang 是 #!/bin/bash，busybox ash 会报错）
 CONFIG_PACKAGE_bash=y
@@ -105,7 +144,7 @@ CONFIG_PACKAGE_luci-i18n-nlbwmon-zh-cn=y
 
 
 # ==============================================================
-# 八、精简：确定用不上的（你这台是纯光猫主机，无 SATA/NVMe/硬盘/AC 管理）
+# 十、精简：确定用不上的（你这台是纯光猫主机，无 SATA/NVMe/硬盘/AC 管理）
 # ==============================================================
 # Gecoos AC 一体机管理，你没有这种设备（约 200KB）
 CONFIG_PACKAGE_luci-app-gecoosac=n
@@ -137,9 +176,14 @@ CONFIG_PACKAGE_kmod-usb-net-ipheth=n
 # USB 上网卡模式切换（3G/4G dongle 才需要；以后要插再改回 y）
 CONFIG_PACKAGE_usb-modeswitch=n
 
+# NATmap（STUN 打洞保活工具，ponwrt 默认带）
+# 用途：运营商 CGNAT 大内网（拿不到公网 IPv4）时，把内网服务暴露到公网。
+# 你的 WAN 是 PPPoE 公网 IP，对外服务直接用防火墙端口转发即可，用不上它。
+CONFIG_PACKAGE_natmap=n
+
 
 # ==============================================================
-# 九、【可选大件】USB 无线网卡驱动全家桶 —— 默认保留，约 2~3MB（压缩后）
+# 十一、【可选大件】USB 无线网卡驱动全家桶 —— 默认保留，约 2~3MB（压缩后）
 # 如果你确定永远不插 USB 无线网卡，把下面整块取消注释能再瘦一圈。
 # 注意：取消后 cfg80211/mac80211 也会随之不装，LuCI 的"无线"菜单会消失。
 # ==============================================================
@@ -167,7 +211,7 @@ CONFIG_PACKAGE_usb-modeswitch=n
 
 
 # ==============================================================
-# 十、千万别动
+# 十二、千万别动
 #   CONFIG_PACKAGE_kmod-nft-offload=y   <- flowtable 硬件加速依赖它
 #   CONFIG_NET_AIROHA_FLOW_STATS        <- 由 Scripts/PRIVATE.sh 在内核配置里关闭，
 #                                          这是 NPU 能真正绑定的前提
